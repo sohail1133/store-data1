@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure User Data Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            margin: 50px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2, h3 {
+            text-align: center;
+        }
+
+        input[type="text"], input[type="password"], input[type="file"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        img, .file-item {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Registration and Login Form -->
+    <div class="container" id="auth-form">
+        <h2 id="form-title">Create Account</h2>
+        <input type="text" id="username" placeholder="Enter Username">
+        <input type="password" id="password" placeholder="Enter Password">
+        <button onclick="handleAuth()">Submit</button>
+        <button onclick="toggleForm()">Switch to Login</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="container hidden" id="dashboard">
+        <h2>Welcome, <span id="user-name"></span></h2>
+        <h3>Manage Your Details</h3>
+
+        <!-- Add and display personal data -->
+        <textarea id="user-message" placeholder="Enter your message"></textarea>
+        <input type="text" id="user-number" placeholder="Enter your number">
+        <button onclick="saveDetails()">Save Details</button>
+        <div id="saved-details"></div>
+
+        <!-- Photo and PDF Upload -->
+        <input type="file" id="file-input" accept="image/*,application/pdf" multiple>
+        <button onclick="saveFiles()">Upload Files</button>
+        <div id="saved-files"></div>
+
+        <button onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+        let users = JSON.parse(localStorage.getItem('users')) || [];
+        let currentUser = null;
+
+        // Toggle between Register and Login forms
+        function toggleForm() {
+            const formTitle = document.getElementById('form-title');
+            if (formTitle.textContent === 'Create Account') {
+                formTitle.textContent = 'Login';
+            } else {
+                formTitle.textContent = 'Create Account';
+            }
+        }
+
+        // Handle User Registration or Login
+        function handleAuth() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const formTitle = document.getElementById('form-title').textContent;
+
+            if (formTitle === 'Create Account') {
+                // Register new user
+                if (users.find(user => user.username === username)) {
+                    alert('Username already exists. Please choose a different username.');
+                    return;
+                }
+
+                users.push({ username, password, details: { message: '', number: '', files: [] } });
+                localStorage.setItem('users', JSON.stringify(users));
+                alert('Account created successfully!');
+            } else {
+                // Login existing user
+                const user = users.find(user => user.username === username && user.password === password);
+                if (!user) {
+                    alert('Invalid username or password.');
+                    return;
+                }
+
+                currentUser = user;
+                localStorage.setItem('currentUser', username);
+                loadDashboard();
+            }
+
+            document.getElementById('auth-form').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        // Load Dashboard after successful login
+        function loadDashboard() {
+            const username = localStorage.getItem('currentUser');
+            const user = users.find(u => u.username === username);
+            currentUser = user;
+
+            document.getElementById('user-name').textContent = currentUser.username;
+
+            // Display saved details and files
+            displayDetails();
+            displayFiles();
+        }
+
+        // Save personal details
+        function saveDetails() {
+            const message = document.getElementById('user-message').value;
+            const number = document.getElementById('user-number').value;
+
+            currentUser.details.message = message;
+            currentUser.details.number = number;
+
+            localStorage.setItem('users', JSON.stringify(users));
+            displayDetails();
+        }
+
+        // Display saved details
+        function displayDetails() {
+            const savedDetails = document.getElementById('saved-details');
+            savedDetails.innerHTML = `
+                <p><strong>Message:</strong> ${currentUser.details.message}</p>
+                <p><strong>Number:</strong> ${currentUser.details.number}</p>
+                <button onclick="deleteDetails()">Delete Details</button>
+            `;
+        }
+
+        // Delete personal details
+        function deleteDetails() {
+            currentUser.details.message = '';
+            currentUser.details.number = '';
+            localStorage.setItem('users', JSON.stringify(users));
+            displayDetails();
+        }
+
+        // Save uploaded files (photos and PDFs)
+        function saveFiles() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+
+            for (let file of files) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    currentUser.details.files.push({ name: file.name, data: e.target.result });
+                    localStorage.setItem('users', JSON.stringify(users));
+                    displayFiles();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Display saved files
+        function displayFiles() {
+            const savedFiles = document.getElementById('saved-files');
+            savedFiles.innerHTML = '';
+
+            currentUser.details.files.forEach((file, index) => {
+                const fileElement = document.createElement('div');
+                fileElement.classList.add('file-item');
+                fileElement.innerHTML = `
+                    <p><strong>${file.name}</strong></p>
+                    ${file.name.endsWith('.pdf') ? <a href="${file.data}" target="_blank">View PDF</a> : <img src="${file.data}" width="100">}
+                    <button onclick="deleteFile(${index})">Delete</button>
+                `;
+                savedFiles.appendChild(fileElement);
+            });
+        }
+
+        // Delete a specific file
+        function deleteFile(index) {
+            currentUser.details.files.splice(index, 1);
+            localStorage.setItem('users', JSON.stringify(users));
+            displayFiles();
+        }
+
+        // Logout user
+        function logout() {
+            localStorage.removeItem('currentUser');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('auth-form').classList.remove('hidden');
+        }
+
+        // On page load, check if user is logged in
+        window.onload = function () {
+            if (localStorage.getItem('currentUser')) {
+                loadDashboard();
+                document.getElementById('auth-form').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+            }
+        };
+    </script>
+</body>
+</html>
